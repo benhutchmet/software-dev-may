@@ -1,6 +1,8 @@
 import os.path as op 
-import netCDF4 as nc 
+import netCDF4 as nc
 import xarray as xr
+import matplotlib.pyplot as plt
+import numpy as np
 
 def load_netcdf(file): 
     """ 
@@ -149,10 +151,13 @@ def extract_data(filename, lat, lon):
     loaded = load_file(filename, "xarray")
 
     # show the information about the loaded file
-    show_info(loaded)
+    #show_info(loaded)
 
     # extract the SST data at the given coordinates
     data = loaded.sel(lat=lat, lon=lon, method="nearest")["analysed_sst"].data
+
+    # extract the SST error at the given coordinates
+    error = loaded.sel(lat=lat, lon=lon, method="nearest")["analysis_error"].data
 
     # if the data is not empty, then print it
     if data: 
@@ -167,7 +172,7 @@ def extract_data(filename, lat, lon):
     # return the extracted data
     return data
 
-def main_program(file_path, lat, lon):
+def main_program(file_path, lat, lon, how="point"):
     """Checks that a file path and coordinates are valid and extracts SST data at the given coordinates.
 
     Parameters
@@ -178,6 +183,8 @@ def main_program(file_path, lat, lon):
         Latitude coordinate to extract data at.
     lon : float
         Longitude coordinate to extract data at.
+    how : str
+        Method to load the file, can be "point" or "line". Defaults to "point".
 
     Returns
     -------
@@ -188,13 +195,120 @@ def main_program(file_path, lat, lon):
 
     # if they are valid, then extract the data
     if valid:
-        extract_data(file_path, lat, lon)
+        if how == "point":
+            extract_data(file_path, lat, lon)
+        elif how == "line":
+            # initialise an empty list to store the data
+            data = []
+            # initialise an empty list to store the error
+            error = []
+            # initialise an empty list to store the latitude
+            lat = []
+            # extract the data
+            data, error, lat = extract_data_along_line(file_path, lon)
+            # plot the data
+            plot_data(data, error, lat)
+        else:
+            print(f"{how} is not a valid method")
+            print("Exiting program")
+            exit()
     else:
         # if they are not valid, then print an error message
         print(error)
         # exit the program if there is an error
         print("Exiting program")
         exit()
+
+# define a function which calls the extract data function
+# along a line of longitude (i.e. in the centre of the Atlantic Ocean)
+# and extracts the SST data and error at each point into an array
+def extract_data_along_line(filename, lon):
+    """Extracts SST data and error along a line of longitude.
+
+    Parameters
+    ----------
+    filename : str
+        Fully qualified pathname of a valid NetCDF file.
+    lon : float
+        Longitude coordinate to extract data at.
+
+    Returns
+    -------
+    data : numpy.ndarray
+        SST data at the given coordinates.
+    error : numpy.ndarray
+        SST error at the given coordinates.
+    lat : numpy.ndarray
+        Latitude coordinates.
+    """
+    # load the file using xarray
+    loaded = load_file(filename, "xarray")
+
+    # extract the SST data, error, and lat at the given coordinates
+    data = loaded.sel(lon=lon, method="nearest")["analysed_sst"].data
+    error = loaded.sel(lon=lon, method="nearest")["analysis_error"].data
+    lat = loaded.sel(lon=lon, method="nearest")["lat"].data
+
+    # create a mask for non-NaN entries in data and error
+    mask = ~np.isnan(data) & ~np.isnan(error)
+
+    # extract only the True + false values from the mask
+    mask_lat = mask[0,:]
+
+    # apply the mask to data, error, and lat
+    data = data[mask]
+    error = error[mask]
+    # specify [0,:] to get the first row of the array
+    lat = lat[mask_lat]
+
+    return data, error, lat
+
+
+# define a plotting function which takes the extracted data and error
+# and plots them on a graph
+# with latitude on the x-axis and SST on the y-axis
+# with error bars
+def plot_data(data, error, lat):
+    """Plots SST data and error on a graph.
+
+    Parameters
+    ----------
+    data : numpy.ndarray
+        SST data at the given coordinates.
+    error : numpy.ndarray
+        SST error at the given coordinates.
+    lat : numpy.ndarray
+        Latitude coordinates.
+
+    Returns
+    -------
+    None
+    """
+    # print the data and shapes for debugging
+    print(data[381:])
+    print(error[381:])
+    print(lat[381:])
+    # check whether any nan values have been introduced
+    print(np.isnan(data).any())
+    print(np.isnan(error).any())
+    # check the shapes of the data
+    print(data.shape)
+    print(error.shape)
+    print(lat.shape)
+
+    # plot the data
+    # with latitude on the x-axis and SST on the y-axis
+    # with error bars
+    # skip over any NaN values
+    plt.plot(lat, data, "b-", label="SST")
+    # add axis labels
+    plt.xlabel("Latitude")
+    plt.ylabel("SST (K)")
+    # add a title
+    plt.title("SST along a line of longitude")
+    # show the plot
+    plt.show()
+
 
 # call main program
 if __name__ == '__main__': 
@@ -204,13 +318,16 @@ if __name__ == '__main__':
     GHR_file = "/workspaces/software-dev-may/data/20100601120000-ESACCI-L4_GHRSST-SSTdepth-OSTIA-GLOB_LT-v02.0-fv01.0.nc"
 
     # define the coordinates
-    lat = 50.0
-    lon = -10.0
+    lat = 50.000245
+    lon = -10.0356456
+
+    # define invalid file path
+    invalid_file = "invalid_file.bash"
 
     # define invalid coordinates
     invalid_lat = 100.0
     invalid_lon = 200.0
 
-    #main_program(GHR_file, lat, lon)
+    #main_program(invalid_file, lat, lon)
 
-    main_program(GHR_file, invalid_lat, invalid_lon)
+    main_program(GHR_file, lat, lon, how="line")
