@@ -300,6 +300,7 @@ def plot_data(data, error, lat):
     # with latitude on the x-axis and SST on the y-axis
     # with error bars
     # skip over any NaN values
+    plt.errorbar(lat, data, yerr=error, fmt="none", ecolor="r", label="Error", alpha=0.3)
     plt.plot(lat, data, "b-", label="SST")
     # add axis labels
     plt.xlabel("Latitude")
