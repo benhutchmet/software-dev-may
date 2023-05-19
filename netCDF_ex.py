@@ -4,8 +4,7 @@ import os.path as op
 
 import xarray as xr
 
-print(‘hello’)
-
+print("hello")
 
 def load_netcdf(file): 
 
